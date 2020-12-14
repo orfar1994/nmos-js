@@ -1,7 +1,7 @@
 import React from 'react';
 import { ThemeProvider } from '@material-ui/styles';
 import { createMuiTheme, responsiveFontSizes } from '@material-ui/core/styles';
-import { blue, lightBlue } from '@material-ui/core/colors';
+//import { blue, lightBlue } from '@material-ui/core/colors';
 import Cookies from 'universal-cookie';
 
 const cookies = new Cookies();
@@ -20,8 +20,14 @@ export const AppThemeProvider = ({ children }) => {
     const theme = responsiveFontSizes(
         createMuiTheme({
             palette: {
-                primary: lightBlue,
-                secondary: blue,
+                primary: {
+                    main: '#76b900',
+                    contrastText: '#ffffff'
+                },
+                secondary: {
+                    main: '#76b900',
+                    contrastText: '#ffffff'
+                },
                 type: themeState.mode,
             },
             sidebar: {
