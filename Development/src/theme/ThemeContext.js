@@ -3,6 +3,7 @@ import { ThemeProvider } from '@material-ui/styles';
 import { createMuiTheme, responsiveFontSizes } from '@material-ui/core/styles';
 import { blue, lightBlue } from '@material-ui/core/colors';
 
+
 export const ThemeContext = React.createContext({
     theme: 'light',
     toggleTheme: () => {},
@@ -16,8 +17,14 @@ export const AppThemeProvider = ({ children }) => {
     const theme = responsiveFontSizes(
         createMuiTheme({
             palette: {
-                primary: lightBlue,
-                secondary: blue,
+                primary: {
+                    main: '#76b900',
+                    contrastText: '#ffffff'
+                },
+                secondary: {
+                    main: '#76b900',
+                    contrastText: '#ffffff'
+                },
                 type: themeState.mode,
             },
             sidebar: {

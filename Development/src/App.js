@@ -4,7 +4,7 @@ import { useTheme } from '@material-ui/styles';
 
 import Dashboard from './pages/settings';
 import { NodesList, NodesShow } from './pages/nodes';
-import { DevicesList, DevicesShow } from './pages/devices';
+import { DevicesList, DevicesShow, DevicesEdit} from './pages/devices';
 import { SourcesList, SourcesShow } from './pages/sources';
 import { FlowsList, FlowsShow } from './pages/flows';
 import { ReceiversEdit, ReceiversList, ReceiversShow } from './pages/receivers';
@@ -30,7 +30,7 @@ const App = () => (
             show={QueryAPIsShow}
         />
         <Resource name="nodes" list={NodesList} show={NodesShow} />
-        <Resource name="devices" list={DevicesList} show={DevicesShow} />
+        <Resource name="devices" list={DevicesList} show={DevicesShow} edit={DevicesEdit}/>
         <Resource name="sources" list={SourcesList} show={SourcesShow} />
         <Resource name="flows" list={FlowsList} show={FlowsShow} />
         <Resource

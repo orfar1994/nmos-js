@@ -506,61 +506,111 @@ const convertDataProviderRequestToHTTP = (
             }
         }
         case UPDATE: {
-            let differences = [];
-            let allDifferences = diff(
-                get(params, 'previousData.$staged'),
-                get(params, 'data.$staged')
-            );
-            if (allDifferences !== undefined) {
-                for (const d of allDifferences) {
-                    if (d.rhs === '') {
-                        if (d.lhs !== null) {
+            if (resource === 'devices'){
+                let differences = [];
+                let allDifferences = diff(
+                    get(params, 'previousData.$active.map'),
+                    get(params, 'data.$staged.active')
+                );
+                if (allDifferences !== undefined) {
+                    for (const d of allDifferences) {
+                        if (d.rhs === '') {
+                            if (d.lhs !== null) {
+                                differences.push({
+                                    kind: d.kind,
+                                    lhs: d.lhs,
+                                    path: d.path,
+                                    rhs: null,
+                                });
+                            }
+                        } else if (isNumber(d.rhs)) {
                             differences.push({
                                 kind: d.kind,
                                 lhs: d.lhs,
                                 path: d.path,
-                                rhs: null,
+                                rhs: Number(d.rhs),
                             });
+                        } else {
+                            differences.push(d);
                         }
-                    } else if (isNumber(d.rhs)) {
-                        differences.push({
-                            kind: d.kind,
-                            lhs: d.lhs,
-                            path: d.path,
-                            rhs: Number(d.rhs),
-                        });
-                    } else {
-                        differences.push(d);
                     }
                 }
-            }
+                let patchData = { action: {} };
+                set(patchData, `activation`,params.data.$staged.activation);
+                for (const d of differences) {
+                    set(patchData.action, `${d.path[0]}`, {});
+                }
+                for (const d of differences) {
+                    let output_channel_map = get(params.data.$staged.active,`${d.path[0]}.${d.path[1]}`);
+                    set(patchData.action, `${d.path[0]}.${d.path[1]}`, output_channel_map);
+                }
+                let st_p = JSON.stringify(patchData);
+                return {
+                    url: concatUrl(params.data.$channelMappingAPI, '/map/activations'),
+                    options: {
+                        method: 'POST',
+                        headers,
+                        body: JSON.stringify(patchData),
+                    },
+                };
+            }else{
+                let differences = [];
+                let allDifferences = diff(
+                    get(params, 'previousData.$staged'),
+                    get(params, 'data.$staged')
+                );
+                if (allDifferences !== undefined) {
+                    for (const d of allDifferences) {
+                        if (d.rhs === '') {
+                            if (d.lhs !== null) {
+                                differences.push({
+                                    kind: d.kind,
+                                    lhs: d.lhs,
+                                    path: d.path,
+                                    rhs: null,
+                                });
+                            }
+                        } else if (isNumber(d.rhs)) {
+                            differences.push({
+                                kind: d.kind,
+                                lhs: d.lhs,
+                                path: d.path,
+                                rhs: Number(d.rhs),
+                            });
+                        } else {
+                            differences.push(d);
+                        }
+                    }
+                }
 
-            let patchData = { transport_params: [] };
-            const legs = get(params, 'data.$staged.transport_params').length;
-            for (let i = 0; i < legs; i++) {
-                patchData.transport_params.push({});
-            }
+                let patchData = { transport_params: [] };
+                const legs = get(params, 'data.$staged.transport_params').length;
+                for (let i = 0; i < legs; i++) {
+                    patchData.transport_params.push({});
+                }
 
             for (const d of differences) {
                 JsonPointer.set(patchData, `/${d.path.join('/')}`, d.rhs, true);
             }
 
-            if (has(patchData, 'transport_file')) {
-                if (get(patchData, 'transport_file.data') === null) {
-                    set(patchData, 'transport_file.type', null);
-                } else {
-                    set(patchData, 'transport_file.type', 'application/sdp');
+                if (has(patchData, 'transport_file')) {
+                    if (get(patchData, 'transport_file.data') === null) {
+                        set(patchData, 'transport_file.type', null);
+                    } else {
+                        set(patchData, 'transport_file.type', 'application/sdp');
+                    }
                 }
-            }
 
-            return {
-                url: concatUrl(params.data.$connectionAPI, '/staged'),
-                options: {
-                    method: 'PATCH',
-                    headers,
-                    body: JSON.stringify(patchData),
-                },
-            };
+                return {
+                    url: concatUrl(params.data.$connectionAPI, '/staged'),
+                    options: {
+                        method: 'PATCH',
+                        headers,
+                        body: JSON.stringify(patchData),
+                    },
+                };
+            }
+            
         }
         case CREATE: {
             return {
@@ -655,6 +705,75 @@ const getEndpoints = (addresses, resource, id) => {
                     )
                 ).then(() => {
                     endpointData.push({ $connectionAPI: connectionAPI });
+                    controller.abort();
+                    resolve(endpointData);
+                });
+            })
+            .catch(errors => {
+                controller.abort();
+                reject(errors[0]);
+            });
+    });
+};
+
+const getCMEndPoints = (addresses , endpoints=['io','map/active','map/activations']) => {
+    // Looking for the first promise to succeed or all to fail
+    const invertPromise = p => new Promise((res, rej) => p.then(rej, res));
+    const firstOf = ps => invertPromise(Promise.all(ps.map(invertPromise)));
+    const endpointData = [];
+    let channelMappingAPI;
+    const controller = new AbortController();
+    const signal = controller.signal;
+
+    return new Promise((resolve, reject) => {
+        firstOf(
+            addresses.map(address => {
+                return timeout(
+                    5000,
+                    fetch(concatUrl(address, ``), {
+                        signal,
+                    })
+                );
+            })
+        )
+            .then(response => {
+                channelMappingAPI = response.url;
+                return endpoints;
+            })
+            .then(endpoints => {
+                if (get(endpoints, 'code')) {
+                    controller.abort();
+                    reject(new Error(`${endpoints.error} - ${endpoints.code}`));
+                    return;
+                }
+                Promise.all(
+                    endpoints.map(endpoint =>
+                        fetch(concatUrl(channelMappingAPI, `/${endpoint}`), {
+                            signal,
+                        })
+                            .then(response => {
+                                if (response.ok) {
+                                    return response.text();
+                                }
+                            })
+                            .then(text => {
+                                try {
+                                    return JSON.parse(text);
+                                } catch (e) {
+                                    return text;
+                                }
+                            })
+                            .then(data => {
+                                endpointData.push({
+                                    [`$${endpoint.split("/").slice(-1)[0]}`]: data,
+                                });
+                            })
+                            .catch(error => {
+                                throw error;
+                            })
+                    )
+                ).then(() => {
+                    endpointData.push({ $channelMappingAPI: channelMappingAPI });
                     controller.abort();
                     resolve(endpointData);
                 });
@@ -773,6 +892,52 @@ const convertHTTPResponseToDataProvider = async (
                         $transporttype: 'urn:x-nmos:transport:rtp',
                     });
                 }
+            }
+            else if(resource === 'devices'){
+                let deviceJSONData = json;
+                let channelmappingAddresses = {};
+                // Device.controls was added in v1.1
+                if (deviceJSONData.hasOwnProperty('controls')) {
+                    deviceJSONData.controls.forEach(control => {
+                        const type = control.type.replace('.', '_');
+                        if (type.startsWith('urn:x-nmos:control:cm-ctrl')){
+                            if (!channelmappingAddresses.hasOwnProperty(type)) {
+                                set(channelmappingAddresses, type, [control.href]);
+                            } else {
+                                channelmappingAddresses[type].push(control.href);
+                            }
+                        }
+                    });
+                }
+                // Return IS-04 if no channel mapping API endpoints
+                if (Object.keys(channelmappingAddresses).length === 0) {
+                    return { url, data: json };
+                }
+
+                const versions = Object.keys(channelmappingAddresses)
+                    .sort()
+                    .reverse();
+
+                let endpointData;
+                
+                for (let version of versions) {
+                    try {
+                        endpointData = await getCMEndPoints(
+                            channelmappingAddresses[version]
+                        );
+                    } catch (e) {}
+                    if (endpointData) break;
+                }
+
+                // Return IS-04 if no channel mapping URL was able to connect
+                if (endpointData === undefined) {
+                    set(json, '$channelMappingAPI', null);
+                    return { url, data: json };
+                }
+
+                for (let i of endpointData) {
+                    assign(json, i);
+                }                
             }
             return { url, data: json };
 
