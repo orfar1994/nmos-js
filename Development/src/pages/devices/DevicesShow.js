@@ -39,26 +39,14 @@ import KeyboardArrowUpIcon from '@material-ui/icons/KeyboardArrowUp';
 import CheckCircleOutlineIcon from '@material-ui/icons/CheckCircleOutline';
 import RadioButtonUncheckedIcon from '@material-ui/icons/RadioButtonUnchecked';
 import Tooltip from '@material-ui/core/Tooltip';
+import ChipConditionalLabel from '../../components/ChipConditionalLabel';
 import MapObject from '../../components/ObjectField';
+import ResourceTitle from '../../components/ResourceTitle';
 import TAIField from '../../components/TAIField';
 import UrlField from '../../components/URLField';
-import ChipConditionalLabel from '../../components/ChipConditionalLabel';
 import { queryVersion } from '../../settings';
 import MappingShowActions from '../../components/MappingShowActions';
 import DeleteButton from '../../components/DeleteButton';
-
-const DevicesTitle = ({ record }) => {
-    return (
-        <span>
-            Device:{' '}
-            {record
-                ? record.label
-                    ? `${record.label}`
-                    : `${record.id}`
-                : 'Unknown'}
-        </span>
-    );
-};
 
 export const DevicesShow = props => {
     const controllerProps = useShowController(props);
@@ -143,7 +131,7 @@ const DevicesShowView = props => {
 
 const ShowSummaryTab = ({ record, ...props }) => {
     return (
-        <ShowView {...props} title={<DevicesTitle />} actions={<Fragment />}>
+        <ShowView {...props} title={<ResourceTitle />} actions={<Fragment />}>
             <SimpleShowLayout>
                 <TextField label="ID" source="id" />
                 <TAIField source="version" />
@@ -258,7 +246,7 @@ const ShowActiveMatrixTab = ({ deviceData, ...props }) => {
         );
     };
     return (
-        <ShowView {...props} title={<DevicesTitle />} actions={<Fragment />}>
+        <ShowView {...props} title={<ResourceTitle />} actions={<Fragment />}>
             <Card>
                 <Title title={' Active Matrix'} />
                 <CardContent>
@@ -669,7 +657,7 @@ const ShowStagedMatrixTab = ({ deviceData, ...props }) => {
     if (!deviceData.$activations) return <Loading />;
 
     return (
-        <ShowView {...props} title={<DevicesTitle />} actions={<Fragment />}>
+        <ShowView {...props} title={<ResourceTitle />} actions={<Fragment />}>
             <Card>
                 <Title title={'Schedule Activations'} />
                 <CardContent>
