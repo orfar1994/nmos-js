@@ -8,17 +8,18 @@ import {
     ReferenceArrayField,
     ReferenceField,
     ReferenceManyField,
-    ShowButton,
     ShowContextProvider,
     ShowView,
     SimpleShowLayout,
     SingleFieldList,
     TextField,
     Title,
+    Toolbar,
     useRecordContext,
     useShowController,
 } from 'react-admin';
 import {
+    Button,
     Card,
     CardContent,
     Paper,
@@ -29,16 +30,14 @@ import {
     TableHead,
     TableRow,
     Tabs,
+    Typography,
 } from '@material-ui/core';
-import { Link, Route } from 'react-router-dom';
+import { Link, Route, Switch } from 'react-router-dom';
 import get from 'lodash/get';
+import has from 'lodash/has';
+import set from 'lodash/set';
 import { useTheme } from '@material-ui/styles';
-import IconButton from '@material-ui/core/IconButton';
-import KeyboardArrowDownIcon from '@material-ui/icons/KeyboardArrowDown';
-import KeyboardArrowUpIcon from '@material-ui/icons/KeyboardArrowUp';
-import CheckCircleOutlineIcon from '@material-ui/icons/CheckCircleOutline';
-import RadioButtonUncheckedIcon from '@material-ui/icons/RadioButtonUnchecked';
-import Tooltip from '@material-ui/core/Tooltip';
+import ImageEye from '@material-ui/icons/RemoveRedEye';
 import ChipConditionalLabel from '../../components/ChipConditionalLabel';
 import MapObject from '../../components/ObjectField';
 import ResourceTitle from '../../components/ResourceTitle';
@@ -47,6 +46,9 @@ import UrlField from '../../components/URLField';
 import { queryVersion } from '../../settings';
 import MappingShowActions from '../../components/MappingShowActions';
 import DeleteButton from '../../components/DeleteButton';
+import BackButton from '../../components/BackButton';
+import ChannelMappingMatrix from './Matrix';
+import MappingButton from '../../components/MappingButton';
 
 export const DevicesShow = props => {
     const controllerProps = useShowController(props);
@@ -59,9 +61,18 @@ export const DevicesShow = props => {
 
 const DevicesShowView = props => {
     const { record } = useRecordContext();
-
     const [useIS08API, setUseIS08API] = useState(false);
-
+    const is_activation_location = () => {
+        if (props.location.pathname.includes('/Staged_Matrix/')) {
+            let activation_id = props.location.pathname.split(
+                '/Staged_Matrix/'
+            )[1];
+            if (has(record.$activations, activation_id)) {
+                return true;
+            }
+        }
+        return false;
+    };
     useEffect(() => {
         if (get(record, '$channelMappingAPI') !== undefined) {
             setUseIS08API(true);
@@ -85,7 +96,11 @@ const DevicesShowView = props => {
                     }}
                 >
                     <Tabs
-                        value={props.location.pathname}
+                        value={
+                            is_activation_location()
+                                ? `${props.basePath}/${props.id}/show/Staged_Matrix`
+                                : props.location.pathname
+                        }
                         indicatorColor="primary"
                         textColor="primary"
                     >
@@ -125,6 +140,20 @@ const DevicesShowView = props => {
             >
                 <ShowStagedMatrixTab deviceData={record} {...props} />
             </Route>
+            {props.location.pathname.includes('/Staged_Matrix/') &&
+                has(
+                    record.$activations,
+                    props.location.pathname.split('/Staged_Matrix/')[1]
+                ) && (
+                    <Route exact path={props.location.pathname}>
+                        <ShowActivation record={record} {...props} />
+                    </Route>
+                )}
+            {/* <Route
+                exact
+                path={`${props.basePath}/${props.id}/show/Staged_Matrix/i`}
+                render={() => <ShowActivation record={record} />}
+            ></Route> */}
         </>
     );
 };
@@ -202,451 +231,17 @@ const ShowSummaryTab = ({ record, ...props }) => {
 };
 
 const ShowActiveMatrixTab = ({ deviceData, ...props }) => {
-    const [expandedCols, setExpandedCols] = React.useState([]);
-    const [expandedRows, setExpandedRows] = React.useState([]);
-
-    if (!deviceData.$active.map) return <Loading />;
-
-    const handleEpandRow = input_real_name => {
-        const currentExpandedRows = expandedRows;
-        const isRowExpanded = currentExpandedRows.includes(input_real_name);
-        const newExpandedRows = isRowExpanded
-            ? currentExpandedRows.filter(name => name !== input_real_name)
-            : currentExpandedRows.concat(input_real_name);
-
-        setExpandedRows(newExpandedRows);
-    };
-    const handleEpandCol = output_real_name => {
-        const currentExpandedCols = expandedCols;
-        const isColExpanded = currentExpandedCols.includes(output_real_name);
-        const newExpandedCols = isColExpanded
-            ? currentExpandedCols.filter(name => name !== output_real_name)
-            : currentExpandedCols.concat(output_real_name);
-
-        setExpandedCols(newExpandedCols);
-    };
-
-    const ischecked = (
-        input_real_name,
-        output_real_name,
-        input_channel,
-        output_channel
-    ) => {
-        const map_to_input = get(
-            deviceData.$active.map,
-            `${output_real_name}.${output_channel}.input`
-        );
-        const map_to_input_channel = get(
-            deviceData.$active.map,
-            `${output_real_name}.${output_channel}.channel_index`
-        );
-        return (
-            map_to_input === input_real_name &&
-            String(map_to_input_channel) === String(input_channel)
-        );
-    };
+    if (!get(deviceData, `$active.map`)) return <Loading />;
     return (
         <ShowView {...props} title={<ResourceTitle />} actions={<Fragment />}>
             <Card>
                 <Title title={' Active Matrix'} />
                 <CardContent>
-                    <Table border={1}>
-                        <TableHead>
-                            <TableRow>
-                                <TableCell
-                                    style={{ color: '#76b900' }}
-                                    size="small"
-                                    align="center"
-                                    rowSpan={3}
-                                    colSpan={3}
-                                >
-                                    {'INPUTS \\ OUTPUTS'}
-                                </TableCell>
-                                {Object.entries(deviceData.$io.outputs).map(
-                                    ([output_nmos_name, output_item]) => (
-                                        <TableCell
-                                            align="center"
-                                            colSpan={
-                                                expandedCols.includes(
-                                                    output_nmos_name
-                                                )
-                                                    ? output_item.channels
-                                                          .length
-                                                    : 1
-                                            }
-                                        >
-                                            {output_item.source_id ? (
-                                                <ReferenceField
-                                                    record={output_item}
-                                                    basePath="/sources"
-                                                    label="Sources"
-                                                    source="source_id"
-                                                    reference="sources"
-                                                    link="show"
-                                                >
-                                                    <ChipConditionalLabel source="label" />
-                                                </ReferenceField>
-                                            ) : null}
-                                        </TableCell>
-                                    )
-                                )}
-                            </TableRow>
-                            <TableRow>
-                                {Object.entries(deviceData.$io.outputs).map(
-                                    ([output_nmos_name, output_item]) => (
-                                        <TableCell
-                                            style={{ color: '#76b900' }}
-                                            size="small"
-                                            align="center"
-                                            colSpan={
-                                                expandedCols.includes(
-                                                    output_nmos_name
-                                                )
-                                                    ? output_item.channels
-                                                          .length
-                                                    : 1
-                                            }
-                                            rowSpan={
-                                                expandedCols.includes(
-                                                    output_nmos_name
-                                                )
-                                                    ? 1
-                                                    : 2
-                                            }
-                                        >
-                                            <IconButton
-                                                aria-label="expand col"
-                                                size="small"
-                                                title={
-                                                    expandedCols.includes(
-                                                        output_nmos_name
-                                                    )
-                                                        ? "Hide output's channels"
-                                                        : "View output's channels"
-                                                }
-                                                onClick={() =>
-                                                    handleEpandCol(
-                                                        output_nmos_name
-                                                    )
-                                                }
-                                            >
-                                                {expandedCols.includes(
-                                                    output_nmos_name
-                                                ) ? (
-                                                    <KeyboardArrowUpIcon />
-                                                ) : (
-                                                    <KeyboardArrowDownIcon />
-                                                )}
-                                            </IconButton>
-                                            {output_item.properties.name}
-                                        </TableCell>
-                                    )
-                                )}
-                            </TableRow>
-                            <TableRow>
-                                {Object.entries(deviceData.$io.outputs).map(
-                                    ([output_nmos_name, output_item]) => {
-                                        return expandedCols.includes(
-                                            output_nmos_name
-                                        )
-                                            ? output_item.channels.map(
-                                                  channel => (
-                                                      <TableCell
-                                                          align="center"
-                                                          size="small"
-                                                          style={{
-                                                              color: '#76b900',
-                                                          }}
-                                                      >
-                                                          {channel.label}
-                                                      </TableCell>
-                                                  )
-                                              )
-                                            : null;
-                                    }
-                                )}
-                            </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            <TableRow>
-                                <TableCell
-                                    align="center"
-                                    colSpan={3}
-                                    style={{ color: '#76b900' }}
-                                >
-                                    {'MUTE'}
-                                </TableCell>
-                                {Object.entries(deviceData.$io.outputs).map(
-                                    ([output_nmos_name, output_item]) => {
-                                        return expandedCols.includes(
-                                            output_nmos_name
-                                        ) ? (
-                                            output_item.channels.map(
-                                                (channel, index) => (
-                                                    <TableCell
-                                                        align="center"
-                                                        style={{
-                                                            color: '#76b900',
-                                                        }}
-                                                    >
-                                                        <Tooltip
-                                                            title={[
-                                                                channel.label,
-                                                                'MUTE',
-                                                            ].join(' ')}
-                                                            placement="bottom"
-                                                        >
-                                                            <div>
-                                                                <IconButton
-                                                                    disabled
-                                                                >
-                                                                    {ischecked(
-                                                                        null,
-                                                                        output_nmos_name,
-                                                                        null,
-                                                                        index
-                                                                    ) ? (
-                                                                        <CheckCircleOutlineIcon />
-                                                                    ) : (
-                                                                        <RadioButtonUncheckedIcon />
-                                                                    )}
-                                                                </IconButton>
-                                                            </div>
-                                                        </Tooltip>
-                                                        {/* <Radio
-                                                    checked={ischecked(null,output_nmos_name,null,index)}
-                                                    onChange={event => handleChange(event)}
-                                                    name={"radio-button-demo"}
-                                                    color= '#76b900'
-                                                    /> */}
-                                                    </TableCell>
-                                                )
-                                            )
-                                        ) : (
-                                            <TableCell align="right">
-                                                {''}
-                                            </TableCell>
-                                        );
-                                    }
-                                )}
-                            </TableRow>
-                            {Object.entries(deviceData.$io.inputs).map(
-                                ([input_nmos_name, input_item]) => (
-                                    <>
-                                        <TableRow>
-                                            <TableCell
-                                                align="center"
-                                                rowSpan={
-                                                    expandedRows.includes(
-                                                        input_nmos_name
-                                                    )
-                                                        ? input_item.channels
-                                                              .length + 1
-                                                        : 1
-                                                }
-                                            >
-                                                {input_item.parent.type ===
-                                                'source' ? (
-                                                    <ReferenceField
-                                                        record={input_item}
-                                                        basePath="/sources"
-                                                        label="Sources"
-                                                        source="parent.id"
-                                                        reference="sources"
-                                                        link="show"
-                                                    >
-                                                        <ChipConditionalLabel source="label" />
-                                                    </ReferenceField>
-                                                ) : input_item.parent.type ===
-                                                  'receiver' ? (
-                                                    <ReferenceField
-                                                        record={input_item}
-                                                        basePath="/receivers"
-                                                        label="Receivers"
-                                                        source="parent.id"
-                                                        reference="receivers"
-                                                        link="show"
-                                                    >
-                                                        <ChipConditionalLabel source="label" />
-                                                    </ReferenceField>
-                                                ) : null}
-                                            </TableCell>
-                                            <TableCell
-                                                style={{ color: '#76b900' }}
-                                                size="small"
-                                                rowSpan={
-                                                    expandedRows.includes(
-                                                        input_nmos_name
-                                                    )
-                                                        ? input_item.channels
-                                                              .length + 1
-                                                        : 1
-                                                }
-                                                colSpan={
-                                                    expandedRows.includes(
-                                                        input_nmos_name
-                                                    )
-                                                        ? 1
-                                                        : 2
-                                                }
-                                            >
-                                                <IconButton
-                                                    aria-label="expand row"
-                                                    size="small"
-                                                    title={
-                                                        expandedRows.includes(
-                                                            input_nmos_name
-                                                        )
-                                                            ? "Hide input's channels"
-                                                            : "View input's channels"
-                                                    }
-                                                    onClick={() =>
-                                                        handleEpandRow(
-                                                            input_nmos_name
-                                                        )
-                                                    }
-                                                >
-                                                    {expandedRows.includes(
-                                                        input_nmos_name
-                                                    ) ? (
-                                                        <KeyboardArrowUpIcon />
-                                                    ) : (
-                                                        <KeyboardArrowDownIcon />
-                                                    )}
-                                                </IconButton>
-                                                {input_item.properties.name}
-                                            </TableCell>
-                                            {expandedRows.includes(
-                                                input_nmos_name
-                                            )
-                                                ? null
-                                                : Object.entries(
-                                                      deviceData.$io.outputs
-                                                  ).map(
-                                                      ([
-                                                          output_nmos_name,
-                                                          output_item,
-                                                      ]) => {
-                                                          return expandedCols.includes(
-                                                              output_nmos_name
-                                                          ) ? (
-                                                              output_item.channels.map(
-                                                                  () => (
-                                                                      <TableCell align="right">
-                                                                          {''}
-                                                                      </TableCell>
-                                                                  )
-                                                              )
-                                                          ) : (
-                                                              <TableCell align="right">
-                                                                  {''}
-                                                              </TableCell>
-                                                          );
-                                                      }
-                                                  )}
-                                        </TableRow>
-                                        {expandedRows.includes(input_nmos_name)
-                                            ? Object.entries(
-                                                  input_item.channels
-                                              ).map(
-                                                  ([input_index, channel]) => (
-                                                      <TableRow>
-                                                          <TableCell
-                                                              size="small"
-                                                              style={{
-                                                                  color:
-                                                                      '#76b900',
-                                                              }}
-                                                          >
-                                                              {channel.label}
-                                                          </TableCell>
-                                                          <>
-                                                              {Object.entries(
-                                                                  deviceData.$io
-                                                                      .outputs
-                                                              ).map(
-                                                                  ([
-                                                                      output_nmos_name,
-                                                                      output_item,
-                                                                  ]) => {
-                                                                      return expandedCols.includes(
-                                                                          output_nmos_name
-                                                                      ) ? (
-                                                                          output_item.channels.map(
-                                                                              (
-                                                                                  output_channel,
-                                                                                  index
-                                                                              ) => {
-                                                                                  return (
-                                                                                      <TableCell
-                                                                                          align="center"
-                                                                                          style={{
-                                                                                              color:
-                                                                                                  '#76b900',
-                                                                                          }}
-                                                                                      >
-                                                                                          <Tooltip
-                                                                                              title={[
-                                                                                                  output_channel.label,
-                                                                                                  channel.label,
-                                                                                              ].join(
-                                                                                                  ' '
-                                                                                              )}
-                                                                                              placement="bottom"
-                                                                                          >
-                                                                                              <div>
-                                                                                                  <IconButton
-                                                                                                      disabled={
-                                                                                                          true
-                                                                                                      }
-                                                                                                      title={[
-                                                                                                          output_channel.label,
-                                                                                                          channel.label,
-                                                                                                      ].join(
-                                                                                                          ' '
-                                                                                                      )}
-                                                                                                  >
-                                                                                                      {ischecked(
-                                                                                                          input_nmos_name,
-                                                                                                          output_nmos_name,
-                                                                                                          input_index,
-                                                                                                          index
-                                                                                                      ) ? (
-                                                                                                          <CheckCircleOutlineIcon></CheckCircleOutlineIcon>
-                                                                                                      ) : (
-                                                                                                          <RadioButtonUncheckedIcon></RadioButtonUncheckedIcon>
-                                                                                                      )}
-                                                                                                  </IconButton>
-                                                                                              </div>
-                                                                                          </Tooltip>
-                                                                                          {/* <Radio
-                                                                    checked={ischecked(input_nmos_name,output_nmos_name,input_index,index)}
-                                                                    onChange={event => handleChange(event)}
-                                                                    name="radio-button-demo"
-                                                                    /> */}
-                                                                                      </TableCell>
-                                                                                  );
-                                                                              }
-                                                                          )
-                                                                      ) : (
-                                                                          <TableCell align="right">
-                                                                              {
-                                                                                  ''
-                                                                              }
-                                                                          </TableCell>
-                                                                      );
-                                                                  }
-                                                              )}
-                                                          </>
-                                                      </TableRow>
-                                                  )
-                                              )
-                                            : null}
-                                    </>
-                                )
-                            )}
-                        </TableBody>
-                    </Table>
+                    <ChannelMappingMatrix
+                        record={deviceData}
+                        is_show={true}
+                        mapping={get(deviceData, `$active.map`)}
+                    />
                 </CardContent>
             </Card>
         </ShowView>
@@ -655,66 +250,298 @@ const ShowActiveMatrixTab = ({ deviceData, ...props }) => {
 
 const ShowStagedMatrixTab = ({ deviceData, ...props }) => {
     if (!deviceData.$activations) return <Loading />;
-
     return (
-        <ShowView {...props} title={<ResourceTitle />} actions={<Fragment />}>
-            <Card>
-                <Title title={'Schedule Activations'} />
-                <CardContent>
-                    <Table>
+        <>
+            <ShowView
+                {...props}
+                title={<ResourceTitle />}
+                actions={<Fragment />}
+            >
+                <Card>
+                    <Title title={'Schedule Activations'} />
+                    <CardContent>
+                        <Table>
+                            <TableHead>
+                                <TableRow>
+                                    <TableCell
+                                        style={{
+                                            paddingLeft: '32px',
+                                        }}
+                                    >
+                                        Activation ID
+                                    </TableCell>
+                                    <TableCell>Mode</TableCell>
+                                    <TableCell>Requested Time</TableCell>
+                                    <TableCell>Activation Time</TableCell>
+                                    <TableCell>Outputs</TableCell>
+                                    <TableCell />
+                                </TableRow>
+                            </TableHead>
+                            <TableBody>
+                                {Object.entries(deviceData.$activations).map(
+                                    ([activation_id, item]) => (
+                                        <TableRow key={activation_id}>
+                                            <TableCell
+                                                component="th"
+                                                scope="row"
+                                            >
+                                                <Button
+                                                    style={{
+                                                        textTransform: 'none',
+                                                    }}
+                                                    size="small"
+                                                    label={activation_id}
+                                                    component={Link}
+                                                    to={`${props.basePath}/${props.id}/show/Staged_Matrix/${activation_id}`}
+                                                    value={`${props.match.url}/Staged_Matrix`}
+                                                    startIcon={<ImageEye />}
+                                                >
+                                                    {activation_id}
+                                                </Button>
+                                            </TableCell>
+                                            <TableCell>
+                                                {item.activation.mode}
+                                            </TableCell>
+                                            <TableCell>
+                                                <TAIField
+                                                    record={item.activation}
+                                                    source={'requested_time'}
+                                                    mode={'mode'}
+                                                />
+                                            </TableCell>
+                                            <TableCell>
+                                                <TAIField
+                                                    record={item.activation}
+                                                    source={'activation_time'}
+                                                    mode={'mode'}
+                                                />
+                                            </TableCell>
+                                            <TableCell>
+                                                <>
+                                                    {Object.keys(
+                                                        item.action
+                                                    ).map(output_nmos_name => (
+                                                        <Typography variant="body2">
+                                                            {get(
+                                                                deviceData.$io
+                                                                    .outputs,
+                                                                `${output_nmos_name}.properties.name`
+                                                            )}
+                                                        </Typography>
+                                                    ))}
+                                                </>
+                                            </TableCell>
+                                            <TableCell>
+                                                <DeleteButton
+                                                    resource="devices"
+                                                    id={activation_id}
+                                                    variant="text"
+                                                    record={deviceData}
+                                                />
+                                            </TableCell>
+                                        </TableRow>
+                                    )
+                                )}
+                            </TableBody>
+                        </Table>
+                    </CardContent>
+                </Card>
+            </ShowView>
+            <Switch>
+                <Route
+                    path={`${props.basePath}/${props.id}/show/Staged_Matrix/i`}
+                    render={() => (
+                        <ShowActivation record={deviceData.$activations} />
+                    )}
+                ></Route>
+            </Switch>
+        </>
+    );
+};
+
+const InputChannelMappingRow = ({
+    input_channel_array,
+    input_nmos_name,
+    record,
+    activation,
+}) => {
+    return input_channel_array.map(channel => (
+        <TableRow>
+            <TableCell>
+                {
+                    get(record, `$io.inputs.${input_nmos_name}.channels`)[
+                        channel
+                    ].label
+                }
+            </TableCell>
+            {Object.entries(activation.action).map(
+                ([output_nmos_name, output_item]) =>
+                    Object.entries(output_item).map(
+                        ([channel_index, channel_item]) => (
+                            <TableCell align="center">
+                                <MappingButton
+                                    disabeld={true}
+                                    ischecked={
+                                        input_nmos_name ===
+                                            channel_item.input &&
+                                        channel_item.channel_index === channel
+                                    }
+                                />
+                            </TableCell>
+                        )
+                    )
+            )}
+        </TableRow>
+    ));
+};
+
+const ShowActivation = ({ record, ...props }) => {
+    const activation_id = props.location.pathname.split('/Staged_Matrix/')[1];
+    const activation = get(record, `$activations.${activation_id}`);
+    set(record, `$activations.${activation_id}.id`, activation_id);
+    const inputs = {};
+    for (const output of Object.values(activation.action)) {
+        for (const input of Object.values(output)) {
+            if (has(inputs, `${input.input}`)) {
+                let channel_array = get(inputs, `${input.input}`);
+                if (!channel_array.includes(input.channel_index)) {
+                    channel_array.push(input.channel_index);
+                    set(inputs, `${input.input}`, channel_array);
+                }
+            } else {
+                set(inputs, `${input.input}`, [input.channel_index]);
+            }
+        }
+    }
+    return (
+        <>
+            <ShowView
+                {...props}
+                title={<ResourceTitle />}
+                actions={<Fragment />}
+            >
+                <SimpleShowLayout>
+                    <TextField
+                        label="ID"
+                        source={`$activations.${activation_id}.id`}
+                    />
+                    <TextField
+                        label="Mode"
+                        source={`$activations.${activation_id}.activation.mode`}
+                    />
+                    <TAIField
+                        label="Requested Time"
+                        source={`$activations.${activation_id}.activation.requested_time`}
+                        mode={'mode'}
+                    />
+                    <TAIField
+                        label="Activation Time"
+                        source={`$activations.${activation_id}.activation.activation_time`}
+                        mode={'mode'}
+                    />
+                    <Table border={1}>
                         <TableHead>
                             <TableRow>
                                 <TableCell
-                                    style={{
-                                        paddingLeft: '32px',
-                                    }}
+                                    style={{ color: '#76b900' }}
+                                    size="small"
+                                    align="center"
+                                    rowSpan={2}
+                                    colSpan={2}
                                 >
-                                    Activation ID
+                                    {'INPUTS \\ OUTPUTS'}
                                 </TableCell>
-                                <TableCell>Mode</TableCell>
-                                <TableCell>Requested Time</TableCell>
-                                <TableCell>Activation Time</TableCell>
-                                <TableCell />
+                                {Object.entries(activation.action).map(
+                                    ([output_nmos_name, output_item]) => (
+                                        <TableCell
+                                            align="center"
+                                            colSpan={
+                                                Object.keys(output_item).length
+                                            }
+                                        >
+                                            {get(
+                                                record,
+                                                `$io.outputs.${output_nmos_name}.properties.name`
+                                            )}
+                                        </TableCell>
+                                    )
+                                )}
+                            </TableRow>
+                            <TableRow>
+                                {Object.entries(activation.action).map(
+                                    ([output_nmos_name, output_item]) =>
+                                        Object.entries(output_item).map(
+                                            ([channel_index, channel_item]) => (
+                                                <TableCell
+                                                    align="center"
+                                                    size="small"
+                                                    style={{
+                                                        color: '#76b900',
+                                                    }}
+                                                >
+                                                    {
+                                                        get(
+                                                            record,
+                                                            `$io.outputs.${output_nmos_name}.channels`
+                                                        )[channel_index].label
+                                                    }
+                                                </TableCell>
+                                            )
+                                        )
+                                )}
                             </TableRow>
                         </TableHead>
                         <TableBody>
-                            {Object.entries(deviceData.$activations).map(
-                                ([activation_id, item]) => (
-                                    <TableRow key={activation_id}>
-                                        <TableCell component="th" scope="row">
-                                            <ShowButton
-                                                style={{
-                                                    textTransform: 'none',
-                                                }}
-                                                basePath="/subscriptions"
-                                                record={item}
-                                                label={activation_id}
-                                            />
-                                        </TableCell>
-                                        <TableCell>
-                                            {item.activation.mode}
-                                        </TableCell>
-                                        <TableCell>
-                                            {item.activation.requested_time}
-                                        </TableCell>
-                                        <TableCell>
-                                            {item.activation.activation_time}
-                                        </TableCell>
-                                        <TableCell>
-                                            <DeleteButton
-                                                resource="subscriptions"
-                                                id={item.id}
-                                                variant="text"
-                                            />
-                                        </TableCell>
-                                    </TableRow>
+                            {Object.entries(inputs).map(
+                                ([input_nmos_name, input_channel_array]) => (
+                                    <>
+                                        <TableRow>
+                                            <TableCell
+                                                rowSpan={
+                                                    input_channel_array.length +
+                                                    1
+                                                }
+                                            >
+                                                {get(
+                                                    record,
+                                                    `$io.inputs.${input_nmos_name}.properties.name`
+                                                )}
+                                            </TableCell>
+                                        </TableRow>
+                                        <InputChannelMappingRow
+                                            input_channel_array={
+                                                input_channel_array
+                                            }
+                                            input_nmos_name={input_nmos_name}
+                                            record={record}
+                                            activation={activation}
+                                        />
+                                    </>
                                 )
                             )}
                         </TableBody>
                     </Table>
-                </CardContent>
-            </Card>
-        </ShowView>
+                </SimpleShowLayout>
+            </ShowView>
+            <Toolbar
+                resource="devices"
+                record={record}
+                style={{ marginTop: 0 }}
+            >
+                <DeleteButton
+                    resource="devices"
+                    id={activation_id}
+                    variant="text"
+                    record={record}
+                />
+                <BackButton
+                    resource="devices"
+                    id={props.id}
+                    variant="text"
+                    record={record}
+                />
+            </Toolbar>
+        </>
     );
 };
 

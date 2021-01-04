@@ -47,7 +47,14 @@ const DeleteButton = ({
     const [deleteOne, { loading }] = useDelete(resource, id, record, {
         onSuccess: () => {
             notify('Element deleted', 'info');
-            if (window.location.hash.substr(1) === `/${resource}`) {
+            let location = window.location.hash.substr(1);
+            if (
+                location === `/${resource}` ||
+                location.endsWith('Staged_Matrix')
+            ) {
+                refresh();
+            } else if (location.match(/Staged_Matrix\/.*/)) {
+                history.push(`/${resource}/${record.id}/show/Staged_Matrix`);
                 refresh();
             } else {
                 history.push(`/${resource}`);

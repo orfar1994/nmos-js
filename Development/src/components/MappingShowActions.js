@@ -16,23 +16,32 @@ import { resourceUrl } from '../dataProvider';
 
 export default function MappingShowActions({ basePath, id, resource }) {
     const { data } = useGetOne(resource, id);
-
     let json_href;
     let hasCreate = false;
     let hasEdit = true;
+    const theme = useTheme();
     if (data) {
         const tab = window.location.href.split('/').pop();
-        if (tab === 'Active_Matrix') {
+        if (tab === 'Active_Matrix' && data.$channelMappingAPI) {
             json_href = concatUrl(data.$channelMappingAPI, `/map/active`);
-        } else if (tab === 'Staged_Matrix') {
+        } else if (tab === 'Staged_Matrix' && data.$channelMappingAPI) {
             json_href = concatUrl(data.$channelMappingAPI, `/map/activations`);
             hasCreate = true;
+            hasEdit = false;
+        } else if (
+            window.location.href.match(/Staged_Matrix\/.*/) &&
+            data.$channelMappingAPI
+        ) {
+            json_href = concatUrl(
+                data.$channelMappingAPI,
+                `/map/activations/${tab}`
+            );
+            hasCreate = false;
             hasEdit = false;
         } else {
             json_href = resourceUrl(resource, `/${data.id}`);
         }
     }
-    const theme = useTheme();
     return (
         <TopToolbar
             style={{

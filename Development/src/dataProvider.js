@@ -664,13 +664,26 @@ const convertDataProviderRequestToHTTP = (
             };
         }
         case DELETE: {
-            return {
-                url: resourceUrl(resource, `/${params.id}`),
-                options: {
-                    method: 'DELETE',
-                    headers,
-                },
-            };
+            if (resource === 'devices') {
+                return {
+                    url: concatUrl(
+                        params.previousData.$channelMappingAPI,
+                        `/map/activations/${params.id}`
+                    ),
+                    options: {
+                        method: 'DELETE',
+                        headers,
+                    },
+                };
+            } else {
+                return {
+                    url: resourceUrl(resource, `/${params.id}`),
+                    options: {
+                        method: 'DELETE',
+                        headers,
+                    },
+                };
+            }
         }
         default: {
             // not expected to be used
@@ -945,7 +958,10 @@ const convertHTTPResponseToDataProvider = async (
                     });
                 }
             } else if (resource === 'devices') {
-                let deviceJSONData = json;
+                let deviceJSONData = await fetch(
+                    resourceUrl(resource, `/${params.id}`)
+                ).then(result => result.json());
+                //let deviceJSONData = json;
                 let channelmappingAddresses = {};
                 // Device.controls was added in v1.1
                 if (deviceJSONData.hasOwnProperty('controls')) {
